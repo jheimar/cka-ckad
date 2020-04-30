@@ -142,6 +142,9 @@ kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
 kubectl taint nodes --all node-role.kubernetes.io/master-
 
 # install ingress example
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.30.0/deploy/static/mandatory.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.30.0/deploy/static/provider/baremetal/service-nodeport.yaml
+
 kubectl apply -f https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/ingress-example/cafe.yaml
 kubectl apply -f https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/ingress-example/cafe-secret.yaml
 kubectl apply -f https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/ingress-example/cafe-ingress.yaml
