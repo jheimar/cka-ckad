@@ -1,0 +1,191 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+BOX_BASE            = "bento/ubuntu-18.04"
+BOX_BASE_VERSION    = "202003.31.0"
+IP_MASTER           = "192.168.205.10"
+IP_NODE1            = "192.168.205.11"
+IP_NODE2            = "192.168.205.12"
+MASTER_NAME         = "k8s-head"
+NODE1_NAME          = "k8s-node-1"
+NODE2_NAME          = "k8s-node-2"
+NODE_TYPE_MASTER    = "master"
+NODE_TYPE_NODE      = "node"
+NODE_MEM            = "1024"
+NODE_CPU            = "2"
+
+servers = [
+    {
+        :name => MASTER_NAME,
+        :type => NODE_TYPE_MASTER,
+        :box => BOX_BASE,
+        :box_version => BOX_BASE_VERSION,
+        :eth1 => IP_MASTER,
+        :mem => NODE_MEM,
+        :cpu => NODE_CPU
+    },
+    {
+        :name => NODE1_NAME,
+        :type => NODE_TYPE_NODE,
+        :box => BOX_BASE,
+        :box_version => BOX_BASE_VERSION,
+        :eth1 => IP_NODE1,
+        :mem => NODE_MEM,
+        :cpu => NODE_CPU
+    },
+    {
+        :name => NODE2_NAME,
+        :type => NODE_TYPE_NODE,
+        :box => BOX_BASE,
+        :box_version => BOX_BASE_VERSION,
+        :eth1 => IP_NODE2,
+        :mem => NODE_MEM,
+        :cpu => NODE_CPU
+    }
+]
+
+
+$configureBox = <<-SCRIPT
+# -----------------------------------------------------------------
+echo "Prerequeriments------------------------------"
+# kubelet requires swap off
+swapoff -a
+
+IP_ADDR=`ifconfig eth1 | grep -w "inet" | awk '{print $2}'| cut -f2 -d:`
+sudo sed 's/127\.0\.1\.1/'$IP_ADDR'/' -i /etc/hosts
+sudo echo "192.168.205.10  cafe.example.com" >> /etc/hosts
+
+# keep swap off after reboot
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+# -----------------------------------------------------------------
+echo "Install Docker CE------------------------------"
+# Install Docker CE
+## Set up the repository:
+### Install packages to allow apt to use a repository over HTTPS
+sudo apt-get update && apt-get install -y \
+  apt-transport-https ca-certificates curl software-properties-common gnupg2 pv
+
+### Add Docker’s official GPG key
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+
+### Add Docker apt repository.
+sudo add-apt-repository \
+  "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) \
+  stable"
+
+## Install Docker CE.
+sudo apt-get update && apt-get install -y \
+  containerd.io=1.2.13-1 \
+  docker-ce=5:19.03.8~3-0~ubuntu-$(lsb_release -cs) \
+  docker-ce-cli=5:19.03.8~3-0~ubuntu-$(lsb_release -cs)
+
+# Setup daemon.
+sudo cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+
+sudo mkdir -p /etc/systemd/system/docker.service.d
+
+# Restart docker.
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+# -----------------------------------------------------------------
+# Installing kubeadm, kubelet and kubectl
+echo "Installing kubeadm, kubelet and kubectl------------------------------"
+# sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+sudo tee /etc/default/kubelet >/dev/null <<EOF
+KUBELET_EXTRA_ARGS=--node-ip=$IP_ADDR
+EOF
+
+systemctl daemon-reload
+systemctl restart kubelet
+
+SCRIPT
+
+$configureMaster = <<-SCRIPT
+echo "This is master"
+# ip of this box
+IP_ADDR=`ifconfig eth1 | grep -w "inet" | awk '{print $2}'| cut -f2 -d:`
+
+# install k8s master
+echo "kubeadm init in master------------------------------"
+HOST_NAME=$(hostname -s)
+sudo kubeadm config images pull
+sudo kubeadm init --apiserver-advertise-address=$IP_ADDR --apiserver-cert-extra-sans=$IP_ADDR  --node-name $HOST_NAME --pod-network-cidr=192.168.0.0/16
+
+#copying credentials to regular user - vagrant
+sudo --user=vagrant mkdir -p /home/vagrant/.kube
+cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
+chown $(id -u vagrant):$(id -g vagrant) /home/vagrant/.kube/config
+
+# install Calico pod network addon
+echo "install Calico pod network addon------------------------------"
+export KUBECONFIG=/etc/kubernetes/admin.conf
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+kubectl taint nodes --all node-role.kubernetes.io/master-
+
+# kubeadm token create
+echo "kubeadm token create------------------------------"
+sudo kubeadm token create --print-join-command >> /etc/kubeadm_join_cmd.sh
+chmod +x /etc/kubeadm_join_cmd.sh
+
+# required for setting up password less ssh between guest VMs
+sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+sudo service sshd restart
+
+SCRIPT
+
+$configureNode = <<-SCRIPT
+MASTER_IP="192.168.205.10"
+echo "This is worker"
+apt-get install -y sshpass
+sshpass -p "vagrant" scp -o StrictHostKeyChecking=no vagrant@$MASTER_IP:/etc/kubeadm_join_cmd.sh .
+sh ./kubeadm_join_cmd.sh
+SCRIPT
+
+Vagrant.configure("2") do |config|
+
+    servers.each do |opts|
+        config.vm.define opts[:name] do |config|
+
+            config.ssh.forward_agent = true
+            config.vm.box = opts[:box]
+            config.vm.box_version = opts[:box_version]
+            config.vm.hostname = opts[:name]
+            config.vm.network :private_network, ip: opts[:eth1]
+
+            config.vm.provider "virtualbox" do |v|
+                v.name = opts[:name]
+            	v.customize ["modifyvm", :id, "--groups", "/Cluster de prueba kubernetes"]
+                v.customize ["modifyvm", :id, "--memory", opts[:mem]]
+                v.customize ["modifyvm", :id, "--cpus", opts[:cpu]]
+            end
+
+            config.vm.provision "shell", inline: $configureBox
+
+            if opts[:type] == "master"
+                config.vm.provision "shell", inline: $configureMaster
+            else
+                puts "Vagrant launched nodes"
+                config.vm.provision "shell", inline: $configureNode
+            end
+        end
+    end
+end 
+
