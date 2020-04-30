@@ -53,10 +53,11 @@ swapoff -a
 
 IP_ADDR=`ifconfig eth1 | grep -w "inet" | awk '{print $2}'| cut -f2 -d:`
 sudo sed 's/127\.0\.1\.1/'$IP_ADDR'/' -i /etc/hosts
-sudo echo "192.168.205.10  cafe.example.com" >> /etc/hosts
+sudo echo "$IP_ADDR  cafe.example.com" >> /etc/hosts
 
 # keep swap off after reboot
 sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
 # -----------------------------------------------------------------
 echo "Install Docker CE------------------------------"
 # Install Docker CE
@@ -139,6 +140,16 @@ echo "install Calico pod network addon------------------------------"
 export KUBECONFIG=/etc/kubernetes/admin.conf
 kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
 kubectl taint nodes --all node-role.kubernetes.io/master-
+
+# install ingress example
+kubectl apply -f https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/ingress-example/cafe.yaml
+kubectl apply -f https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/ingress-example/cafe-secret.yaml
+kubectl apply -f https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/ingress-example/cafe-ingress.yaml
+
+# Install demo
+wget -q https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/demo/demo-magic.sh
+wget -q https://raw.githubusercontent.com/labnube/cka-ckad/master/lab/demo/demo-template.sh
+chmod +x demo-template.sh
 
 # kubeadm token create
 echo "kubeadm token create------------------------------"
