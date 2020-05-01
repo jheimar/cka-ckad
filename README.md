@@ -2,6 +2,17 @@
 
 ### Noticia: 30% de descuento en las certificaciones hasta el 30 de abril [Coupon Code](https://training.linuxfoundation.org/april-2020-promo)
 
+# Creación del ambiente de pruebas
+
+- Moverse a la carpeta lab y ejecutar
+        ```
+        vagrant up
+        ```
+- Luego de que finalice, ingresar al nodo k8s-head
+        ```
+        vagrant ssh k8s-head
+        ```
+
 El objetivo de este repositorio es ayudar a pasar los examenes de Certified Kubernetes Application Developer (CKAD) y Certified Kubernetes Administrator (CKA) utilizando recursos en línea, especialmente utilizando recursos de [Documentación oficial de Kubernetes] (https://kubernetes.io).
 
 Las referencias se seleccionaron para el Currículo de examen 1.18, que utiliza la versión Kubernetes 1.18, y hay información exclusiva para objetos API y anotaciones. Para obtener más información, consulte [CKA Curriculum 1.18](https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_V1.18.pdf) y [CKAD Curriculum 1.18](https://github.com/cncf/curriculum/blob/master/CKAD_Curriculum_V1.18.pdf)
@@ -399,3 +410,10 @@ kubectl get svc  -o wide --all-namespaces
 
 - [Kubernetes Deep Dive - A Cloud Guru](https://acloud.guru/learn/kubernetes-deep-dive)
 
+# Links interesantes
+
+- [jecnua preparation.article](https://go-talks.appspot.com/github.com/jecnua/notes-presentations/notes/containers/orchestration/k8s/certifications/00-preparation.article)
+
+- [jecnua cka.article](https://go-talks.appspot.com/github.com/jecnua/notes-presentations/notes/containers/orchestration/k8s/certifications/01-cka.article)
+
+- [katacoda](https://www.katacoda.com/courses/kubernetes)
