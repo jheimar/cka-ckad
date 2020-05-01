@@ -32,7 +32,7 @@ Ademas de un conjunto de ejercicios que te ayudaron a prepararme para el examen 
 
 # CKA Curriculum
 
-Exam objectives that outline of the knowledge, skills and abilities that a Certified Kubernetes Administrator (CKA) can be expected to demonstrate.
+El Objetivo del examen es demostrar el conocimiento, las habilidades que se espera que un Administrador Certificado de Kubernetes (CKA) demuestre.
 
 ## Application Lifecycle Management 8%
 
